@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Moon, Sun, Loader2, Eye, EyeOff } from 'lucide-react'; // Added Eye icons
 import { auth, db } from './firebase'; // Import your firebase config
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { getRoleById, getUserByEmail } from './services/databaseService';
+import { getUserByEmail } from './services/databaseService';
 
 const Login = () => {
   const [role, setRole] = useState('Student');
@@ -29,9 +29,13 @@ const Login = () => {
       const userData = await getUserByEmail(user.email);
       
       if (userData) {
-        // 3. Fetch Role Name using role_id (ER Diagram: ROLE entity relationship)
-        const roleData = await getRoleById(userData.role_id);
-        const userRoleName = roleData ? roleData.role_name : 'Student';
+        // 3. Derive role name directly from role_id
+        const roleMap = {
+          1: 'Admin',
+          2: 'Teacher',
+          3: 'Student'
+        };
+        const userRoleName = roleMap[userData.role_id] || 'Student';
         
         // 4. Role Validation: Check if the selected role matches the DB role
         if (userRoleName === role) {
