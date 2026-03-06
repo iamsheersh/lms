@@ -6,12 +6,13 @@ import { auth } from './firebase';
 import { getTopics, getMaterialsByTopic, getTestHistoryByUser, getStudentDashboardData, updateVideoProgress, getVideoProgressByUser } from './services/databaseService';
 import TestComponent from './components/TestComponent';
 import FileUploadComponent from './components/FileUploadComponent';
+import { useTheme } from './ThemeContext';
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
   
   // Theme State
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useTheme();
   const [selectedTopic, setSelectedTopic] = useState(null);
   
   // Data States
@@ -125,7 +126,7 @@ const StudentDashboard = () => {
             <div className="flex items-center gap-4">
               {/* Theme Toggle Button */}
               <button 
-                onClick={() => setIsDark(!isDark)}
+                onClick={toggleTheme}
                 className={`p-2.5 rounded-xl border transition-all ${
                   isDark ? 'bg-slate-800 border-slate-700 text-yellow-400' : 'bg-slate-50 border-slate-200 text-slate-600'
                 }`}

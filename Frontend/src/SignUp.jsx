@@ -5,6 +5,7 @@ import { auth, db, storage } from './firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { createUser, getRoleByName } from './services/databaseService';
 import { Loader2, Moon, Sun, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { useTheme } from './ThemeContext';
 
 const Signup = () => {
   const [role, setRole] = useState('Student');
@@ -13,8 +14,8 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isDark, setIsDark] = useState(false);
   const navigate = useNavigate();
+  const { isDark, toggleTheme } = useTheme();
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -58,7 +59,7 @@ const Signup = () => {
       
       {/* Theme Toggle */}
       <button 
-        onClick={() => setIsDark(!isDark)}
+        onClick={toggleTheme}
         className={`absolute top-8 right-8 p-3 rounded-full transition-all duration-300 shadow-lg ${isDark ? 'bg-slate-800 text-yellow-400 border-slate-700' : 'bg-white text-slate-600 border-slate-200'} border`}
       >
         {isDark ? <Sun size={24} /> : <Moon size={24} />}

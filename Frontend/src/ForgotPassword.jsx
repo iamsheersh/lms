@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Mail, ShieldCheck, Sun, Moon, Loader2 } from 'lucide-react';
 import { auth } from './firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
+import { useTheme } from './ThemeContext';
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
-  const [isDark, setIsDark] = useState(false); // Theme State
+  const { isDark, toggleTheme } = useTheme(); // Theme State
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -37,7 +38,7 @@ const ForgotPassword = () => {
       
       {/* --- TOP RIGHT THEME TOGGLE --- */}
       <button 
-        onClick={() => setIsDark(!isDark)}
+        onClick={toggleTheme}
         className={`absolute top-8 right-8 p-3 rounded-full transition-all duration-300 shadow-lg border ${
           isDark 
           ? 'bg-slate-800 text-yellow-400 border-slate-700 hover:bg-slate-700' 

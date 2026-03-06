@@ -147,6 +147,16 @@ export const getUsersByRole = async (roleId) => {
   }
 };
 
+export const getAllUsers = async () => {
+  try {
+    const usersSnapshot = await getDocs(collection(db, USER_COLLECTION));
+    return usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error('Error fetching all users:', error);
+    return [];
+  }
+};
+
 export const updateUserRole = async (userId, roleId) => {
   try {
     await updateDoc(doc(db, USER_COLLECTION, userId), { role_id: roleId });

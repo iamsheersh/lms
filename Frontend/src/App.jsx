@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
+import { ThemeProvider } from './ThemeContext';
 import Login from './Login';
 import StudentDashboard from './StudentDashboard';
 import TeacherDashboard from './TeacherDashboard';
@@ -26,40 +27,42 @@ export default function App() {
   }, []);
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/Signup" element={<Signup />} />
-        
-        {/* --- PROTECTED ROUTES --- */}
-        <Route 
-          path="/student-dashboard" 
-          element={
-            <ProtectedRoute allowedRole="Student">
-              <StudentDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route 
-          path="/teacher-dashboard" 
-          element={
-            <ProtectedRoute allowedRole="Teacher">
-              <TeacherDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route 
-          path="/admin-dashboard" 
-          element={
-            <ProtectedRoute allowedRole="Admin">
-              <AdminDashboard />
-            </ProtectedRoute>
-          } 
-        />
-      </Routes>
-    </Router>
+    <ThemeProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/Signup" element={<Signup />} />
+          
+          {/* --- PROTECTED ROUTES --- */}
+          <Route 
+            path="/student-dashboard" 
+            element={
+              <ProtectedRoute allowedRole="Student">
+                <StudentDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/teacher-dashboard" 
+            element={
+              <ProtectedRoute allowedRole="Teacher">
+                <TeacherDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/admin-dashboard" 
+            element={
+              <ProtectedRoute allowedRole="Admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+        </Routes>
+      </Router>
+    </ThemeProvider>
   );
 }

@@ -4,13 +4,13 @@ import { Moon, Sun, CheckCircle2 } from 'lucide-react'; // Added CheckCircle2
 import { signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { createTest, createContent, getTeacherDashboardStats } from './services/databaseService';
+import { useTheme } from './ThemeContext';
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null); // Ref for file input
   const [activeTab, setActiveTab] = useState('create-test');
-  
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useTheme();
   
   const [testTitle, setTestTitle] = useState('');
   const [contentTitle, setContentTitle] = useState('');
@@ -198,7 +198,7 @@ const TeacherDashboard = () => {
 
       <main className="flex-1 p-8 md:p-12 overflow-y-auto relative">
         <button 
-          onClick={() => setIsDark(!isDark)}
+          onClick={toggleTheme}
           className={`absolute top-8 right-8 p-3 rounded-full border transition-all shadow-lg z-50 ${isDark ? 'bg-slate-800 border-slate-700 text-yellow-400' : 'bg-white border-slate-200 text-slate-600'}`}
         >
           {isDark ? <Sun size={20} /> : <Moon size={20} />}

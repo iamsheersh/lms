@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Moon, Sun } from 'lucide-react'; // Ensure you have lucide-react installed
 import { signOut } from 'firebase/auth';
 import { auth } from './firebase';
+import { getAllUsers } from './services/databaseService';
+import { useTheme } from './ThemeContext';
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   
-  // --- NEW: THEME STATE ---
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleTheme } = useTheme();
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersError, setUsersError] = useState('');
 
-  // --- MOCK DATA ---
+  // --- MOCK DATA (only for overview stats) ---
   const stats = [
     { label: 'Total Students', value: '1,284', grow: '+12%', icon: '🎓', color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Total Teachers', value: '14', grow: 'Stable', icon: '👨‍🏫', color: 'text-indigo-600', bg: 'bg-indigo-50' },
@@ -18,12 +22,62 @@ const AdminDashboard = () => {
     { label: 'Revenue (Mock)', value: '₹45k', grow: '+8%', icon: '💰', color: 'text-amber-600', bg: 'bg-amber-50' },
   ];
 
-  const users = [
-    { id: 1, name: "Arjun Mehta", email: "arjun@lms.com", role: "Student", date: "Jan 01, 2026", status: "Active" },
-    { id: 2, name: "Sneha Rao", email: "sneha@lms.com", role: "Student", date: "Jan 02, 2026", status: "Active" },
-    { id: 3, name: "Dr. Robert", email: "robert@lms.com", role: "Teacher", date: "Dec 28, 2025", status: "Active" },
-    { id: 4, name: "Karan Singh", email: "karan@lms.com", role: "Student", date: "Jan 03, 2026", status: "Pending" },
-  ];
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setUsersLoading(true);
+        setUsersError('');
+        const rawUsers = await getAllUsers();
+
+        const roleMap = {
+          1: 'Admin',
+          2: 'Teacher',
+          3: 'Student'
+        };
+
+        const mapped = rawUsers.map((u) => {
+          const createdAt =
+            u.createdAt && typeof u.createdAt.toDate === 'function'
+              ? u.createdAt.toDate()
+              : u.createdAt
+              ? new Date(u.createdAt)
+              : null;
+
+          const date =
+            createdAt && !Number.isNaN(createdAt.getTime())
+              ? createdAt.toLocaleDateString('en-IN', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric'
+                })
+              : '-';
+
+          const role =
+            u.role ||
+            roleMap[u.role_id] ||
+            'Student';
+
+          return {
+            id: u.id,
+            name: u.name || (u.email ? u.email.split('@')[0] : 'Unknown'),
+            email: u.email || '',
+            role,
+            status: 'Active',
+            date
+          };
+        });
+
+        setUsers(mapped);
+      } catch (error) {
+        console.error('Failed to load users', error);
+        setUsersError('Failed to load users.');
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
 const handleLogout = async () => {
   try {
@@ -91,7 +145,7 @@ const handleLogout = async () => {
           <div className="flex gap-3 items-center">
              {/* THEME TOGGLE BUTTON */}
              <button 
-                onClick={() => setIsDark(!isDark)}
+               onClick={toggleTheme}
                 className={`p-2.5 rounded-xl border transition-all duration-300 shadow-sm ${
                     isDark ? 'bg-slate-800 border-slate-700 text-yellow-400 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
@@ -154,7 +208,28 @@ const handleLogout = async () => {
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                {users.map((u) => (
+                {usersLoading && (
+                  <tr>
+                    <td colSpan="4" className="p-6 text-center text-sm text-slate-500">
+                      Loading users...
+                    </td>
+                  </tr>
+                )}
+                {!usersLoading && usersError && (
+                  <tr>
+                    <td colSpan="4" className="p-6 text-center text-sm text-red-500">
+                      {usersError}
+                    </td>
+                  </tr>
+                )}
+                {!usersLoading && !usersError && users.length === 0 && (
+                  <tr>
+                    <td colSpan="4" className="p-6 text-center text-sm text-slate-500">
+                      No users found.
+                    </td>
+                  </tr>
+                )}
+                {!usersLoading && !usersError && users.map((u) => (
                   <tr key={u.id} className={`transition-colors ${isDark ? 'hover:bg-slate-800/30' : 'hover:bg-blue-50/30'}`}>
                     <td className="p-6">
                       <p className={`font-bold text-sm ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{u.name}</p>
@@ -166,7 +241,11 @@ const handleLogout = async () => {
                     <td className="p-6">
                       <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${u.status === 'Active' ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>{u.status}</span>
                     </td>
-                    <td className="p-6"><button className="text-blue-600 text-xs font-black uppercase tracking-tighter hover:text-blue-400">Edit</button></td>
+                    <td className="p-6">
+                      <button className="text-blue-600 text-xs font-black uppercase tracking-tighter hover:text-blue-400">
+                        Edit
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
