@@ -5,7 +5,6 @@ import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import { getTopics, getMaterialsByTopic, getTestHistoryByUser, getStudentDashboardData, updateVideoProgress, getVideoProgressByUser } from './services/databaseService';
 import TestComponent from './components/TestComponent';
-import FileUploadComponent from './components/FileUploadComponent';
 import { useTheme } from './ThemeContext';
 
 const StudentDashboard = () => {
@@ -23,7 +22,6 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showTest, setShowTest] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
   const [progress, setProgress] = useState({ completedContent: 0, totalContent: 0, averageCompletion: 0 });
 
   // Load user data
@@ -92,20 +90,6 @@ const StudentDashboard = () => {
       navigate('/', { replace: true });
     } catch (error) {
       console.error("Logout failed", error);
-    }
-  };
-
-  const handleFileUpload = async (materialData) => {
-    try {
-      await addMaterial(materialData);
-      // Refresh materials list
-      if (selectedTopic) {
-        const materialsData = await getMaterialsByTopic(selectedTopic.id);
-        setMaterials(materialsData);
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      throw error;
     }
   };
 
@@ -251,15 +235,7 @@ const StudentDashboard = () => {
                 {selectedTopic ? (
                   <div className="space-y-3">
                     <p className={`text-sm mb-4 uppercase font-bold tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Selected: {selectedTopic.name}</p>
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Available Materials</h3>
-                      <button
-                        onClick={() => setShowUpload(true)}
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-700 transition-colors"
-                      >
-                        Upload Material
-                      </button>
-                    </div>
+                    <h3 className={`text-sm font-medium mb-4 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Available Materials</h3>
                     {materials.length === 0 ? (
                       <div className={`text-center py-8 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                         <FileText className="mx-auto mb-2" size={32} />
@@ -330,13 +306,6 @@ const StudentDashboard = () => {
         )}
 
         {/* Upload Component Modal */}
-        {showUpload && (
-          <FileUploadComponent
-            topicId={selectedTopic?.id}
-            onFileUpload={handleFileUpload}
-            onClose={() => setShowUpload(false)}
-          />
-        )}
       </div>
     </>
   );

@@ -82,7 +82,7 @@ const Login = () => {
       }`}>
         
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-black text-blue-600 tracking-tight">LMS Portal</h1>
+          <h1 className="text-4xl font-black text-blue-600 tracking-tight">Syntalytix</h1>
           <p className={`mt-2 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             Please sign in to your account
           </p>
