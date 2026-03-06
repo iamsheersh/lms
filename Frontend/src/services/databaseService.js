@@ -58,8 +58,14 @@ export const getRoles = async () => {
 
 export const getRoleById = async (roleId) => {
   try {
-    const roleDoc = await getDoc(doc(db, ROLE_COLLECTION, roleId));
-    return roleDoc.exists() ? { id: roleDoc.id, ...roleDoc.data() } : null;
+    const q = query(
+      collection(db, ROLE_COLLECTION),
+      where('role_id', '==', roleId)
+    );
+    const roleSnapshot = await getDocs(q);
+    return roleSnapshot.empty
+      ? null
+      : { id: roleSnapshot.docs[0].id, ...roleSnapshot.docs[0].data() };
   } catch (error) {
     console.error('Error fetching role:', error);
     return null;

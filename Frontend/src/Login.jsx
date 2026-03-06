@@ -39,6 +39,7 @@ const Login = () => {
           localStorage.setItem('userRole', role);
           localStorage.setItem('userId', userData.id);
           localStorage.setItem('roleId', userData.role_id);
+          localStorage.setItem('isAuthenticated', 'true');
           
           // Navigate based on role
           if (role === 'Student') navigate('/student-dashboard');
