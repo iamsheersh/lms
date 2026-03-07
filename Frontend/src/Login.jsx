@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Moon, Sun, Loader2, Eye, EyeOff } from 'lucide-react'; // Added Eye icons
 import { auth, db } from './firebase'; // Import your firebase config
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { getUserByUid } from './services/databaseService';
+import { getUserByEmail } from './services/databaseService';
 import { useTheme } from './ThemeContext';
 
 const Login = () => {
@@ -27,8 +27,8 @@ const Login = () => {
       const user = userCredential.user;
 
       // 2. Fetch User Data from Firestore (ER Diagram: USER entity)
-      const userData = await getUserByUid(user.uid);
-
+      const userData = await getUserByEmail(user.email);
+      
       if (userData) {
         // 3. Derive role name directly from role_id
         const roleMap = {
@@ -42,7 +42,7 @@ const Login = () => {
         if (userRoleName === role) {
           // Save user role and ID to localStorage for ProtectedRoute
           localStorage.setItem('userRole', role);
-          localStorage.setItem('userId', user.uid);
+          localStorage.setItem('userId', userData.id);
           localStorage.setItem('roleId', userData.role_id);
           localStorage.setItem('isAuthenticated', 'true');
           

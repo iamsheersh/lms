@@ -27,16 +27,16 @@ const Signup = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2. Self-signup is Student only (role_id: 3) to match Firestore rules
-      const effectiveRole = 'Student';
+      // 2. Get role_id from ROLE entity based on selected role name (ER Diagram)
+      const roleData = await getRoleByName(role);
+      const roleId = roleData ? roleData.role_id : 3; // Default to Student (role_id: 3)
 
       // 3. Save user to USER collection with proper ER Diagram structure
       await createUser({
-        uid: user.uid,
         name: email.split('@')[0], // Default name from email
         email: user.email,
         password: password, // Note: In production, don't store plain password
-        role_name: effectiveRole,
+        role_name: role,      // This will be converted to role_id
         createdAt: new Date()
       });
 

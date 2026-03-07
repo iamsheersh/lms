@@ -5,7 +5,6 @@ import {
   getDocs, 
   getDoc, 
   addDoc, 
-  setDoc,
   updateDoc, 
   deleteDoc,
   query, 
@@ -101,26 +100,12 @@ export const createUser = async (userData) => {
       role_id: role ? role.role_id : 3,
       createdAt: serverTimestamp()
     };
-
-    if (!userData.uid) {
-      throw new Error('createUser requires userData.uid so the profile can be stored at users/{uid}');
-    }
-
-    await setDoc(doc(db, USER_COLLECTION, userData.uid), userDataWithRole, { merge: true });
-    return { id: userData.uid, ...userDataWithRole };
+    
+    const docRef = await addDoc(collection(db, USER_COLLECTION), userDataWithRole);
+    return { id: docRef.id, ...userDataWithRole };
   } catch (error) {
     console.error('Error creating user:', error);
     throw error;
-  }
-};
-
-export const getUserByUid = async (uid) => {
-  try {
-    const userDoc = await getDoc(doc(db, USER_COLLECTION, uid));
-    return userDoc.exists() ? { id: userDoc.id, ...userDoc.data() } : null;
-  } catch (error) {
-    console.error('Error fetching user by uid:', error);
-    return null;
   }
 };
 
@@ -195,7 +180,7 @@ export const createTest = async (testData) => {
       max_score: testData.max_score || 100,
       questions: testData.questions || [],
       createdAt: serverTimestamp(),
-      published: testData.published ?? false
+      published: false
     };
     
     const docRef = await addDoc(collection(db, TESTS_COLLECTION), testWithMetadata);
@@ -227,21 +212,6 @@ export const getTestsByCreator = async (creatorId) => {
     return testsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
     console.error('Error fetching tests by creator:', error);
-    return [];
-  }
-};
-
-export const getPublishedTestsByTopic = async (topic) => {
-  try {
-    const testsSnapshot = await getDocs(collection(db, TESTS_COLLECTION));
-    const tests = testsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    const normalizedTopic = String(topic ?? '').trim().toLowerCase();
-    return tests
-      .filter(t => t.published !== false)
-      .filter(t => String(t.topic ?? '').trim().toLowerCase() === normalizedTopic);
-  } catch (error) {
-    console.error('Error fetching published tests by topic:', error);
     return [];
   }
 };
@@ -288,10 +258,7 @@ export const recordTestScore = async (testHistoryData) => {
       score: testHistoryData.score,
       date_taken: serverTimestamp(),
       timeSpent: testHistoryData.timeSpent || 0,
-      answers: testHistoryData.answers || [],
-      test_name: testHistoryData.test_name,
-      topic: testHistoryData.topic,
-      totalQuestions: testHistoryData.totalQuestions
+      answers: testHistoryData.answers || []
     };
     
     const docRef = await addDoc(collection(db, TEST_HISTORY_COLLECTION), historyData);
@@ -306,16 +273,12 @@ export const getTestHistoryByUser = async (userId) => {
   try {
     const q = query(
       collection(db, TEST_HISTORY_COLLECTION),
-      where('user_id', '==', userId)
+      where('user_id', '==', userId),
+      orderBy('date_taken', 'desc'),
+      limit(20)
     );
     const historySnapshot = await getDocs(q);
-    const items = historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    items.sort((a, b) => {
-      const aTime = (a.date_taken?.toMillis?.() ?? new Date(a.date_taken || 0).getTime() ?? 0);
-      const bTime = (b.date_taken?.toMillis?.() ?? new Date(b.date_taken || 0).getTime() ?? 0);
-      return bTime - aTime;
-    });
-    return items.slice(0, 20);
+    return historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
     console.error('Error fetching test history:', error);
     return [];
@@ -326,16 +289,11 @@ export const getTestHistoryByTest = async (testId) => {
   try {
     const q = query(
       collection(db, TEST_HISTORY_COLLECTION),
-      where('test_id', '==', testId)
+      where('test_id', '==', testId),
+      orderBy('date_taken', 'desc')
     );
     const historySnapshot = await getDocs(q);
-    const items = historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    items.sort((a, b) => {
-      const aTime = (a.date_taken?.toMillis?.() ?? new Date(a.date_taken || 0).getTime() ?? 0);
-      const bTime = (b.date_taken?.toMillis?.() ?? new Date(b.date_taken || 0).getTime() ?? 0);
-      return bTime - aTime;
-    });
-    return items;
+    return historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
     console.error('Error fetching test history by test:', error);
     return [];
@@ -492,16 +450,11 @@ export const getVideoProgressByUser = async (userId) => {
   try {
     const q = query(
       collection(db, VIDEO_PROGRESS_COLLECTION),
-      where('user_id', '==', userId)
+      where('user_id', '==', userId),
+      orderBy('last_watched', 'desc')
     );
     const progressSnapshot = await getDocs(q);
-    const items = progressSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    items.sort((a, b) => {
-      const aTime = (a.last_watched?.toMillis?.() ?? new Date(a.last_watched || 0).getTime() ?? 0);
-      const bTime = (b.last_watched?.toMillis?.() ?? new Date(b.last_watched || 0).getTime() ?? 0);
-      return bTime - aTime;
-    });
-    return items;
+    return progressSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
     console.error('Error fetching video progress:', error);
     return [];
@@ -677,13 +630,10 @@ export const getTestResultsByUser = async (userId) => {
 export const saveTestResult = async (userId, testResult) => {
   const historyData = {
     user_id: userId,
-    test_id: testResult.testId,
+    test_id: testResult.testId || 'unknown',
     score: testResult.score,
     timeSpent: testResult.timeSpent || 0,
-    answers: testResult.answers || [],
-    test_name: testResult.testName,
-    topic: testResult.topic,
-    totalQuestions: testResult.totalQuestions
+    answers: testResult.answers || []
   };
   return recordTestScore(historyData);
 };
