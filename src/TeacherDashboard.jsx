@@ -253,12 +253,13 @@ const TeacherDashboard = () => {
   return (
     <div className={`min-h-screen flex font-sans antialiased transition-colors duration-500 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-[#f8fafc] text-slate-900'}`}>
       
-      <aside className={`w-72 border-r flex flex-col p-6 sticky top-0 h-screen shadow-sm transition-colors ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-        <div className="mb-10 px-2">
-          <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 tracking-tight">
-            Teacher Panel
-          </h1>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Instructor Workspace</p>
+      <aside className={`w-72 flex flex-col p-6 sticky top-0 h-screen shadow-2xl transition-colors ${isDark ? 'bg-black border-r border-slate-800' : 'bg-[#0f172a] text-white'}`}>
+        <div className="mb-10 px-2 flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center font-black text-xl text-white">T</div>
+          <div>
+            <h1 className="text-xl font-black tracking-tight text-white">Teacher</h1>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Instructor Workspace</p>
+          </div>
         </div>
 
         <nav className="flex-1 space-y-2">
@@ -272,10 +273,10 @@ const TeacherDashboard = () => {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-4 p-4 rounded-2xl font-bold transition-all duration-200 group ${
+              className={`w-full flex items-center gap-4 p-4 rounded-2xl font-bold transition-all duration-300 group ${
                 activeTab === item.id 
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 scale-[1.02]' 
-                : `${isDark ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50 scale-[1.02]' 
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
             >
               <span className={`text-xl ${activeTab === item.id ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>{item.icon}</span>
@@ -286,10 +287,10 @@ const TeacherDashboard = () => {
 
         <button 
           onClick={handleLogout} 
-          className="mt-auto flex items-center gap-4 p-4 rounded-2xl font-bold text-slate-400 hover:bg-red-50 hover:text-red-600 transition-all duration-200 cursor-pointer group"
+          className="mt-auto flex items-center gap-4 p-4 rounded-2xl font-bold text-slate-500 hover:bg-red-500/10 hover:text-red-400 transition-all cursor-pointer"
         >
-          <span className="text-xl opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-transform">👋</span>
-          <span className="text-sm">Logout</span>
+          <span className="text-xl">�</span>
+          <span className="text-sm">Log out</span>
         </button>
       </aside>
 
