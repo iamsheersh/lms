@@ -30,22 +30,29 @@ const Login = () => {
       const userData = await getUserByUid(user.uid);
 
       if (userData) {
-        // 3. Derive role name directly from role_id
+        // 3. Derive role name directly from role_id (fallback to legacy `role` string)
         const roleMap = {
           1: 'Admin',
           2: 'Teacher',
           3: 'Student'
         };
-        const userRoleName = roleMap[userData.role_id] || 'Student';
-        
+
+        const legacyRole = typeof userData.role === 'string' ? userData.role : null;
+        const userRoleName = roleMap[userData.role_id] || legacyRole || 'Student';
+
+        const roleIdFromLegacy = legacyRole === 'Admin' ? 1 : legacyRole === 'Teacher' ? 2 : legacyRole === 'Student' ? 3 : null;
+        const effectiveRoleId = userData.role_id ?? roleIdFromLegacy;
+
         // 4. Role Validation: Check if the selected role matches the DB role
         if (userRoleName === role) {
           // Save user role and ID to localStorage for ProtectedRoute
           localStorage.setItem('userRole', role);
           localStorage.setItem('userId', user.uid);
-          localStorage.setItem('roleId', userData.role_id);
+          if (effectiveRoleId != null) {
+            localStorage.setItem('roleId', effectiveRoleId);
+          }
           localStorage.setItem('isAuthenticated', 'true');
-          
+
           // Navigate based on role
           if (role === 'Student') navigate('/student-dashboard');
           else if (role === 'Teacher') navigate('/teacher-dashboard');
