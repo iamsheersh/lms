@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function getUserRoleId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role_id;
+    }
+
+    function isAdmin() { return signedIn() && getUserRoleId() == 1; }
+    function isTeacher() { return signedIn() && getUserRoleId() == 2; }
+    function isStudent() { return signedIn() && getUserRoleId() == 3; }
+
+    match /roles/{roleId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+
+      allow create: if signedIn() && (
+        (request.auth.uid == userId && request.resource.data.role_id == 3) ||
+        isAdmin()
+      );
+
+      allow update: if signedIn() && (
+        isAdmin() ||
+        (request.auth.uid == userId && request.resource.data.role_id == resource.data.role_id)
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    match /tests/{testId} {
+      allow read: if signedIn();
+      allow create: if isTeacher() || isAdmin();
+      allow update, delete: if signedIn() &&
+        (request.auth.uid == resource.data.creator_id || isAdmin());
+    }
+
+    match /test_history/{historyId} {
+      allow read: if signedIn() && (
+        request.auth.uid == resource.data.user_id ||
+        isAdmin() ||
+        (isTeacher() &&
+          get(/databases/$(database)/documents/tests/$(resource.data.test_id)).data.creator_id == request.auth.uid
+        )
+      );
+
+      allow create: if signedIn() && request.auth.uid == request.resource.data.user_id;
+      allow update: if signedIn() && (request.auth.uid == resource.data.user_id || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /content/{contentId} {
+      allow read: if signedIn();
+      allow create: if isTeacher() || isAdmin();
+      allow update, delete: if signedIn() &&
+        (request.auth.uid == resource.data.uploader_id || isAdmin());
+    }
+
+    match /video_progress/{progressId} {
+      allow read: if signedIn() &&
+        (request.auth.uid == resource.data.user_id || isAdmin());
+
+      allow create: if signedIn() && request.auth.uid == request.resource.data.user_id;
+      allow update, delete: if signedIn() &&
+        (request.auth.uid == resource.data.user_id || isAdmin());
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
