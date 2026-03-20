@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'; 
+import React, { useState, useEffect } from 'react'; 
 import { useNavigate } from 'react-router-dom';
 import { Moon, Sun, CheckCircle2 } from 'lucide-react'; 
 import { signOut } from 'firebase/auth';
@@ -8,20 +8,18 @@ import { useTheme } from './ThemeContext';
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
-  const fileInputRef = useRef(null); 
   const [activeTab, setActiveTab] = useState('create-test');
   const { isDark, toggleTheme } = useTheme();
   
   const [testTitle, setTestTitle] = useState('');
   const [contentTitle, setContentTitle] = useState('');
-  const [contentCategory, setContentCategory] = useState('video');
-  const [contentUrl, setContentUrl] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null); 
+  const [contentTopic, setContentTopic] = useState('');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [driveUrl, setDriveUrl] = useState('');
   const [questions, setQuestions] = useState([
     { id: 1, type: 'mcq', question: '', options: ['', '', '', ''], correctOption: 0 } 
   ]);
   const [publishing, setPublishing] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0); 
 
   const [myTests, setMyTests] = useState([]);
   const [myContent, setMyContent] = useState([]);
@@ -123,13 +121,11 @@ const TeacherDashboard = () => {
 
   const startEditContent = (c) => {
     setEditingContentId(c.id);
-    setActiveTab('upload');
+    setActiveTab('materials');
     setContentTitle(c.title || '');
-    setContentCategory(c.type || 'video');
-    setContentUrl(c.url || '');
-    setSelectedFile(null);
-    setUploadProgress(0);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setContentTopic(c.topic || '');
+    setYoutubeUrl(c.youtubeUrl || '');
+    setDriveUrl(c.driveUrl || '');
   };
 
   const handleDeleteTest = async (testId) => {
@@ -197,54 +193,35 @@ const TeacherDashboard = () => {
     }
   };
 
-  const handlePublishMaterial = async () => {
-    if (!contentTitle) return alert("Please provide a title");
-
+  const handlePublishMaterial = async (e) => {
+    e.preventDefault();
+    if (!contentTitle || !contentTopic || (!youtubeUrl && !driveUrl)) {
+      alert('Please fill in all required fields and provide at least one URL.');
+      return;
+    }
     setPublishing(true);
     try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        alert("You must be logged in to publish materials");
-        return;
-      }
-
-      const contentData = {
-        uploader_id: currentUser.uid,  
-        title: contentTitle,           
-        topic: "General",              
-        type: contentCategory,         
-        url: selectedFile ? URL.createObjectURL(selectedFile) : (contentUrl || '#'), 
-        description: `Uploaded file: ${selectedFile ? selectedFile.name : 'No file'}`,
-        published: true
+      const materialData = {
+        title: contentTitle,
+        topic: contentTopic,
+        youtubeUrl: youtubeUrl.trim(),
+        driveUrl: driveUrl.trim(),
+        uploadedBy: auth.currentUser.uid,
+        createdAt: new Date().toISOString()
       };
-
       if (editingContentId) {
-        const updateData = { ...contentData };
-        if (!selectedFile && !contentUrl) {
-          delete updateData.url;
-        }
-        await updateContent(editingContentId, updateData);
+        await updateContent(editingContentId, materialData);
       } else {
-        await createContent(contentData);
+        await createContent(materialData);
       }
-      console.log('Material published successfully!');
-      alert(editingContentId ? 'Material updated successfully!' : 'Material published successfully!');
       setContentTitle('');
-      setContentUrl('');
-      setSelectedFile(null);
-      setUploadProgress(0);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      setEditingContentId(null);
+      setContentTopic('');
+      setYoutubeUrl('');
+      setDriveUrl('');
+      alert(editingContentId ? 'Material updated successfully!' : 'Material published successfully!');
     } catch (error) {
-      console.error('Full error object:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-
-      if (error.code === 'permission-denied') {
-        alert('Firebase Permission Denied. Please update your Firestore security rules in Firebase Console.\n\nGo to: Firebase Console > Firestore Database > Rules\n\nAdd this rule:\nmatch /{document=**} {\n  allow read, write: if request.auth != null;\n}');
-      } else {
-        alert('Failed to publish material: ' + error.message);
-      }
+      console.error('Error publishing material:', error);
+      alert('Failed to publish material: ' + error.message);
     } finally {
       setPublishing(false);
     }
@@ -264,11 +241,11 @@ const TeacherDashboard = () => {
 
         <nav className="flex-1 space-y-2">
           {[
-            { id: 'upload', icon: '📤', label: 'Upload Content' },
-            { id: 'create-test', icon: '📝', label: 'Create Test' },
-            { id: 'my-tests', icon: '📚', label: 'My Tests' },
-            { id: 'my-content', icon: '🗂️', label: 'My Content' },
-            { id: 'tracking', icon: '📊', label: 'Student Tracking' }
+            { id: 'materials', icon: '', label: 'Upload Content' },
+            { id: 'create-test', icon: '', label: 'Create Test' },
+            { id: 'my-tests', icon: '', label: 'My Tests' },
+            { id: 'my-content', icon: '', label: 'My Content' },
+            { id: 'tracking', icon: '', label: 'Student Tracking' }
           ].map((item) => (
             <button
               key={item.id}
@@ -289,7 +266,7 @@ const TeacherDashboard = () => {
           onClick={handleLogout} 
           className="mt-auto flex items-center gap-4 p-4 rounded-2xl font-bold text-slate-500 hover:bg-red-500/10 hover:text-red-400 transition-all cursor-pointer"
         >
-          <span className="text-xl">�</span>
+          <span className="text-xl"></span>
           <span className="text-sm">Log out</span>
         </button>
       </aside>
@@ -302,79 +279,104 @@ const TeacherDashboard = () => {
           {isDark ? <Sun size={20} /> : <Moon size={20} />}
         </button>
 
-        {activeTab === 'upload' && (
+        {activeTab === 'materials' && (
           <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className={`text-3xl font-black mb-8 tracking-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>Upload Learning Materials</h2>
+            <h2 className={`text-3xl font-black mb-8 tracking-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>Upload Learning Material</h2>
             <div className={`p-8 rounded-[2rem] shadow-xl border space-y-8 transition-colors ${isDark ? 'bg-slate-900 border-slate-800 shadow-none' : 'bg-white border-slate-100 shadow-slate-200/50'}`}>
               {editingContentId && (
                 <div className={`p-4 rounded-2xl text-xs font-bold ${isDark ? 'bg-slate-950 text-slate-400 border border-slate-800' : 'bg-slate-50 text-slate-500 border border-slate-100'}`}>
                   Editing existing content
                 </div>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Content Title</label>
-                  <input 
-                    type="text" 
-                    value={contentTitle}
-                    onChange={(e) => setContentTitle(e.target.value)}
-                    placeholder="e.g. Advanced JavaScript Patterns" 
-                    className={`w-full p-4 border rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200'}`} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
-                  <select 
-                    value={contentCategory}
-                    onChange={(e) => setContentCategory(e.target.value)}
-                    className={`w-full p-4 border rounded-2xl outline-none cursor-pointer focus:border-blue-500 ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200'}`}
-                  >
-                    <option value="video">Video Lecture</option>
-                    <option value="pdf">PDF Resource</option>
-                    <option value="link">Resource Link</option>
-                  </select>
-                </div>
-              </div>
-
-              {contentCategory === 'link' && (
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Resource URL</label>
+              <form onSubmit={handlePublishMaterial} className="space-y-4">
+                <div>
+                  <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Content Title *</label>
                   <input
                     type="text"
-                    value={contentUrl}
-                    onChange={(e) => setContentUrl(e.target.value)}
-                    placeholder="https://..."
-                    className={`w-full p-4 border rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 transition-all ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200'}`}
+                    value={contentTitle}
+                    onChange={(e) => setContentTitle(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl border transition-all ${
+                      isDark 
+                      ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500' 
+                      : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500'
+                    }`}
+                    placeholder="e.g., Introduction to Photosynthesis"
+                    required
                   />
                 </div>
-              )}
-
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                onChange={(e) => setSelectedFile(e.target.files[0])}
-              />
-              <div 
-                onClick={() => fileInputRef.current.click()}
-                className={`border-2 border-dashed rounded-[2rem] p-16 text-center transition-all cursor-pointer group ${selectedFile ? 'border-blue-500 bg-blue-50/20' : isDark ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-blue-50/50 hover:border-blue-300'}`}
-              >
-                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                  <span className="text-2xl">{selectedFile ? '✅' : '📁'}</span>
+                <div>
+                  <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Topic Name *</label>
+                  <input
+                    type="text"
+                    value={contentTopic}
+                    onChange={(e) => setContentTopic(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl border transition-all ${
+                      isDark 
+                      ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500' 
+                      : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500'
+                    }`}
+                    placeholder="e.g., Biology"
+                    required
+                  />
                 </div>
-                <p className={`font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                  {selectedFile ? selectedFile.name : 'Drag & drop files or browse'}
-                </p>
-                {uploadProgress > 0 && <p className="text-blue-500 font-bold mt-2">{uploadProgress}% Uploaded</p>}
-              </div>
-
-              <button 
-                onClick={handlePublishMaterial}
-                disabled={publishing}
-                className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all active:scale-[0.99] dark:bg-blue-600 dark:hover:bg-blue-700 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {publishing ? 'Publishing...' : (editingContentId ? 'Update Material' : 'Publish Material')}
-              </button>
+                <div>
+                  <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>YouTube Video URL</label>
+                  <input
+                    type="url"
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl border transition-all ${
+                      isDark 
+                      ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500' 
+                      : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500'
+                    }`}
+                    placeholder="https://youtube.com/watch?v=..."
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Google Drive URL (PDF/PPT/Word)</label>
+                  <input
+                    type="url"
+                    value={driveUrl}
+                    onChange={(e) => setDriveUrl(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl border transition-all ${
+                      isDark 
+                      ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500' 
+                      : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500'
+                    }`}
+                    placeholder="https://drive.google.com/file/d/..."
+                  />
+                </div>
+                <div className="flex gap-4">
+                  <button
+                    type="submit"
+                    disabled={publishing}
+                    className={`flex-1 py-3 px-6 rounded-xl font-black transition-all ${
+                      publishing
+                      ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl'
+                    }`}
+                  >
+                    {publishing ? 'Publishing...' : (editingContentId ? 'Update Material' : 'Publish Material')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContentTitle('');
+                      setContentTopic('');
+                      setYoutubeUrl('');
+                      setDriveUrl('');
+                    }}
+                    className={`px-6 py-3 rounded-xl font-black transition-all ${
+                      isDark 
+                      ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' 
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -395,7 +397,7 @@ const TeacherDashboard = () => {
                   value={testTitle}
                   onChange={(e) => setTestTitle(e.target.value)}
                   placeholder="e.g. Fullstack React Certification Quiz" 
-                  className={`w-full p-5 border rounded-2xl outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-500 font-bold text-lg transition-all ${isDark ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200'}`} 
+                  className={`w-full p-5 border rounded-2xl outline-none font-bold text-lg transition-all ${isDark ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : 'bg-slate-50 border-slate-200'}`} 
                 />
               </div>
 

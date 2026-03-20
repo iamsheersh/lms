@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Moon, Sun, BookOpen, Play, FileText, Clock, TrendingUp } from 'lucide-react';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
-import { getTopics, getMaterialsByTopic, getTestHistoryByUser, getStudentDashboardData, updateVideoProgress, getVideoProgressByUser, getPublishedTestsByTopic } from './services/databaseService';
+import { getTopics, getMaterialsByTopic, getTestHistoryByUser, getStudentDashboardData, updateVideoProgress, getVideoProgressByUser, getPublishedTestsByTopic, getContent } from './services/databaseService';
 import TestComponent from './components/TestComponent';
+import YouTubePlayer from './components/YouTubePlayer';
 import { useTheme } from './ThemeContext';
 
 const StudentDashboard = () => {
@@ -23,10 +24,23 @@ const StudentDashboard = () => {
   const [error, setError] = useState('');
   const [showTest, setShowTest] = useState(false);
   const [selectedTest, setSelectedTest] = useState(null);
-  const [selectedTopic, setSelectedTopic] = useState(null); // FIXED: Added missing state
+  const [selectedTopic, setSelectedTopic] = useState(null); 
+  const [allContent, setAllContent] = useState([]);
+
   const [progress, setProgress] = useState({ completedContent: 0, totalContent: 0, averageCompletion: 0 });
 
-  // Load user data
+  useEffect(() => {
+    const loadAllContent = async () => {
+      try {
+        const content = await getContent();
+        setAllContent(content || []);
+      } catch (err) {
+        console.error('Error loading all content:', err);
+      }
+    };
+    loadAllContent();
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -129,6 +143,7 @@ const StudentDashboard = () => {
             { id: 'scores', icon: '📈', label: 'View Scores' },
             { id: 'tests', icon: '📝', label: 'Tests Attempted' },
             { id: 'materials', icon: '📚', label: 'Study Materials' },
+            { id: 'my-content', icon: '📁', label: 'My Content' },
             { id: 'progress', icon: '📈', label: 'My Progress' }
           ].map((item) => (
             <button
@@ -271,33 +286,79 @@ const StudentDashboard = () => {
                         </div>
                       ) : (
                         materials.map((material) => (
-                          <div key={material.id} className={`flex justify-between items-center p-4 border rounded-2xl transition cursor-pointer group hover:shadow-md ${
-                            isDark ? 'bg-slate-900 border-slate-800 hover:bg-slate-800' : 'bg-white border-slate-100 hover:shadow-md'
-                          }`}>
+                          <div
+                            key={material.id}
+                            className={`space-y-3 p-4 border rounded-2xl transition group hover:shadow-md ${
+                              isDark ? 'bg-slate-900 border-slate-800 hover:bg-slate-800' : 'bg-white border-slate-100 hover:shadow-md'
+                            }`}
+                          >
                             <div className="flex items-center gap-3">
                               {material.type === 'video' && <Play className="w-5 h-5 text-red-500" size={16} />}
-                              {material.type === 'pdf' && <FileText className="w-5 h-5 text-blue-500" size={16} />}
-                              {material.type === 'simulation' && <BookOpen className="w-5 h-5 text-green-500" size={16} />}
+                              {material.type !== 'video' && material.type !== 'test' && (
+                                <FileText className="w-5 h-5 text-blue-500" size={16} />
+                              )}
                               {material.type === 'test' && <BookOpen className="w-5 h-5 text-purple-500" size={16} />}
-                              <div>
-                                <span className={`font-bold transition ${isDark ? 'text-slate-300 group-hover:text-blue-400' : 'text-slate-600 group-hover:text-blue-600'}`}>
-                                  {material.name}
-                                </span>
-                              </div>
+                              <span
+                                className={`font-bold transition ${
+                                  isDark ? 'text-slate-300 group-hover:text-blue-400' : 'text-slate-600 group-hover:text-blue-600'
+                                }`}
+                              >
+                                {material.name}
+                              </span>
                             </div>
-                            <button 
-                              onClick={() => {
-                                if (material.type === 'test') {
+
+                            {material.type === 'video' && (
+                              <div className="space-y-2">
+                                <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black">
+                                  {material.url.includes('youtube.com') || material.url.includes('youtu.be') ? (
+                                    <iframe
+                                      src={material.url.replace('watch?v=', 'embed/')}
+                                      title={material.name}
+                                      className="w-full h-full"
+                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                      allowFullScreen
+                                    />
+                                  ) : (
+                                    <video src={material.url} controls className="w-full h-full" />
+                                  )}
+                                </div>
+                                {currentUser && (
+                                  <button
+                                    onClick={() =>
+                                      updateVideoProgress({
+                                        user_id: currentUser.uid,
+                                        content_id: material.id,
+                                        completion_percentage: 100,
+                                      })
+                                    }
+                                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                                  >
+                                    Mark as Completed
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {material.type !== 'video' && material.type !== 'test' && (
+                              <button
+                                onClick={() => window.open(material.url, '_blank')}
+                                className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors"
+                              >
+                                Open Resource
+                              </button>
+                            )}
+
+                            {material.type === 'test' && (
+                              <button
+                                onClick={() => {
                                   setSelectedTest(material.test);
                                   setShowTest(true);
-                                  return;
-                                }
-                                window.open(material.url, '_blank');
-                              }}
-                              className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors"
-                            >
-                              {material.type === 'test' ? 'Take Test' : material.type === 'video' ? 'Watch' : material.type === 'pdf' ? 'View' : 'Start'}
-                            </button>
+                                }}
+                                className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors"
+                              >
+                                Take Test
+                              </button>
+                            )}
                           </div>
                         ))
                       )}
@@ -375,6 +436,72 @@ const StudentDashboard = () => {
                   ))
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'my-content' && (
+          <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className={`text-3xl font-black mb-8 tracking-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>My Content</h2>
+            <div className="space-y-6">
+              {allContent.length === 0 ? (
+                <div className={`p-8 text-center rounded-2xl ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                  <FileText className="mx-auto mb-4" size={48} />
+                  <p className={`text-lg font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>No content available yet</p>
+                  <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'} mt-2`}>Check back later for learning materials uploaded by your teachers.</p>
+                </div>
+              ) : (
+                allContent.map((content) => (
+                  <div key={content.id} className={`p-6 rounded-3xl shadow-sm border transition-all ${
+                    isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
+                  }`}>
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className={`text-xl font-bold mb-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>{content.title}</h3>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            content.type === 'video' 
+                            ? 'bg-red-100 text-red-700' 
+                            : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {content.type === 'video' ? '📹 Video' : '📄 Document'}
+                          </span>
+                          <span className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                            Topic: {content.topic || 'General'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Content Display */}
+                    {content.type === 'video' && content.youtubeUrl && (
+                      <YouTubePlayer videoUrl={content.youtubeUrl} title={content.title} />
+                    )}
+                    
+                    {content.type === 'document' && content.driveUrl && (
+                      <div className="space-y-4">
+                        <div className={`p-4 border-2 border-dashed rounded-xl ${
+                          isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-300 bg-slate-50'
+                        }`}>
+                          <div className="flex items-center gap-3">
+                            <FileText className="text-blue-500" size={24} />
+                            <div>
+                              <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Document Available</p>
+                              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Click below to open in Google Drive</p>
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => window.open(content.driveUrl, '_blank')}
+                          className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
+                        >
+                          Open Document
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}

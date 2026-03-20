@@ -364,15 +364,29 @@ export const getUserTestStats = async (userId) => {
 
 export const createContent = async (contentData) => {
   try {
+    // Auto-detect content type based on URLs
+    let type = 'document';
+    let url = contentData.driveUrl || contentData.url || '';
+    
+    if (contentData.youtubeUrl) {
+      type = 'video';
+      url = contentData.youtubeUrl;
+    } else if (contentData.driveUrl) {
+      type = 'document';
+      url = contentData.driveUrl;
+    }
+    
     const contentWithMetadata = {
-      uploader_id: contentData.uploader_id,
+      uploadedBy: contentData.uploadedBy || contentData.uploader_id,
       title: contentData.title,
       topic: contentData.topic,
-      type: contentData.type,
-      url: contentData.url,
+      youtubeUrl: contentData.youtubeUrl || '',
+      driveUrl: contentData.driveUrl || '',
+      type,
+      url,
       description: contentData.description || '',
-      createdAt: serverTimestamp(),
-      published: contentData.published || false
+      createdAt: contentData.createdAt || serverTimestamp(),
+      published: contentData.published !== undefined ? contentData.published : true
     };
     
     const docRef = await addDoc(collection(db, CONTENT_COLLECTION), contentWithMetadata);
@@ -397,7 +411,7 @@ export const getContentByUploader = async (uploaderId) => {
   try {
     const q = query(
       collection(db, CONTENT_COLLECTION),
-      where('uploader_id', '==', uploaderId),
+      where('uploadedBy', '==', uploaderId),
       orderBy('createdAt', 'desc')
     );
     const contentSnapshot = await getDocs(q);

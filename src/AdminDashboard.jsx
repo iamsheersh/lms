@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Moon, Sun } from 'lucide-react'; // Ensure you have lucide-react installed
+import { Moon, Sun, Edit, Trash2, Play, FileText } from 'lucide-react'; // Ensure you have lucide-react installed
 import { signOut } from 'firebase/auth';
 import { auth } from './firebase';
-import { getAllUsers } from './services/databaseService';
+import { getAllUsers, getContent, getTests, deleteContent, deleteTest } from './services/databaseService';
 import { useTheme } from './ThemeContext';
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   
   const { isDark, toggleTheme } = useTheme();
   const [users, setUsers] = useState([]);
+  const [allContent, setAllContent] = useState([]);
+  const [allTests, setAllTests] = useState([]);
+  const [contentLoading, setContentLoading] = useState(true);
+  const [testsLoading, setTestsLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(true);
   const [usersError, setUsersError] = useState('');
 
@@ -76,18 +81,66 @@ const AdminDashboard = () => {
       }
     };
 
+    const fetchContent = async () => {
+      try {
+        setContentLoading(true);
+        const content = await getContent();
+        setAllContent(content || []);
+      } catch (error) {
+        console.error('Failed to load content', error);
+      } finally {
+        setContentLoading(false);
+      }
+    };
+
+    const fetchTests = async () => {
+      try {
+        setTestsLoading(true);
+        const tests = await getTests();
+        setAllTests(tests || []);
+      } catch (error) {
+        console.error('Failed to load tests', error);
+      } finally {
+        setTestsLoading(false);
+      }
+    };
+
     fetchUsers();
+    fetchContent();
+    fetchTests();
   }, []);
 
-const handleLogout = async () => {
-  try {
-    await signOut(auth);
-    localStorage.clear();
-    navigate('/', { replace: true });
-  } catch (error) {
-    console.error("Logout failed", error);
-  }
-};
+  const handleDeleteContent = async (contentId) => {
+    if (!confirm('Delete this content? This action cannot be undone.')) return;
+    try {
+      await deleteContent(contentId);
+      setAllContent(prev => prev.filter(c => c.id !== contentId));
+    } catch (error) {
+      console.error('Failed to delete content:', error);
+      alert('Failed to delete content.');
+    }
+  };
+
+  const handleDeleteTest = async (testId) => {
+    if (!confirm('Delete this test? This action cannot be undone.')) return;
+    try {
+      await deleteTest(testId);
+      setAllTests(prev => prev.filter(t => t.id !== testId));
+    } catch (error) {
+      console.error('Failed to delete test:', error);
+      alert('Failed to delete test.');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      localStorage.clear();
+      navigate('/', { replace: true });
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+  };
 
   return (
     <div className={`min-h-screen flex font-sans antialiased transition-colors duration-500 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-[#f1f5f9] text-slate-900'}`}>
@@ -255,24 +308,120 @@ const handleLogout = async () => {
 
         {/* --- TAB 3: GLOBAL CONTENT --- */}
         {activeTab === 'content' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
-            {['React Mastery', 'Database Design', 'UI/UX Fundamentals'].map((course, i) => (
-              <div key={i} className={`p-6 rounded-[2rem] shadow-md border transition-all ${
-                  isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
-              }`}>
-                <div className={`w-full h-32 rounded-2xl mb-4 flex items-center justify-center text-4xl ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>📚</div>
-                <h4 className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{course}</h4>
-                <p className="text-xs text-slate-400 mt-1">12 Videos • 4 PDF Resources</p>
-                <div className="mt-4 flex gap-2">
-                  <button className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors ${
-                      isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                  }`}>Manage</button>
-                  <button className={`p-2 rounded-xl text-xs transition-colors ${
-                      isDark ? 'bg-red-900/20 text-red-400 hover:bg-red-900/40' : 'bg-red-50 text-red-500 hover:bg-red-100'
-                  }`}>🗑️</button>
-                </div>
+          <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Content Section */}
+            <div className={`rounded-[2.5rem] shadow-xl border overflow-hidden transition-colors ${
+              isDark ? 'bg-slate-900 border-slate-800 shadow-none' : 'bg-white border-slate-200/60'
+            }`}>
+              <div className="p-6 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}">
+                <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>All Learning Content</h3>
               </div>
-            ))}
+              <div className="p-6 space-y-4">
+                {contentLoading ? (
+                  <div className="flex justify-center items-center h-24">
+                    <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : allContent.length === 0 ? (
+                  <div className={`text-center p-8 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <FileText className="mx-auto mb-4" size={48} />
+                    <p className="text-lg font-bold">No content available</p>
+                    <p className="text-sm mt-2">Teachers haven't uploaded any content yet.</p>
+                  </div>
+                ) : (
+                  allContent.map((content) => (
+                    <div key={content.id} className={`p-4 border rounded-2xl flex items-center justify-between gap-4 ${
+                      isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'
+                    }`}>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          {content.type === 'video' ? (
+                            <Play className="w-5 h-5 text-red-500" size={16} />
+                          ) : (
+                            <FileText className="w-5 h-5 text-blue-500" size={16} />
+                          )}
+                          <h4 className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{content.title}</h4>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${
+                            content.type === 'video' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {content.type === 'video' ? 'Video' : 'Document'}
+                          </span>
+                          <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Topic: {content.topic || 'General'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors">
+                          <Edit size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteContent(content.id)}
+                          className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Tests Section */}
+            <div className={`rounded-[2.5rem] shadow-xl border overflow-hidden transition-colors ${
+              isDark ? 'bg-slate-900 border-slate-800 shadow-none' : 'bg-white border-slate-200/60'
+            }`}>
+              <div className="p-6 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}">
+                <h3 className={`text-xl font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>All Tests</h3>
+              </div>
+              <div className="p-6 space-y-4">
+                {testsLoading ? (
+                  <div className="flex justify-center items-center h-24">
+                    <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : allTests.length === 0 ? (
+                  <div className={`text-center p-8 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <FileText className="mx-auto mb-4" size={48} />
+                    <p className="text-lg font-bold">No tests available</p>
+                    <p className="text-sm mt-2">Teachers haven't created any tests yet.</p>
+                  </div>
+                ) : (
+                  allTests.map((test) => (
+                    <div key={test.id} className={`p-4 border rounded-2xl flex items-center justify-between gap-4 ${
+                      isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'
+                    }`}>
+                      <div className="flex-1">
+                        <h4 className={`font-bold mb-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>{test.test_name || 'Untitled Test'}</h4>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className={`px-2 py-1 rounded text-xs font-bold bg-purple-100 text-purple-700`}>
+                            Test
+                          </span>
+                          <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {test.questions?.length || 0} questions
+                          </span>
+                          <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Topic: {test.topic || 'General'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors">
+                          <Edit size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteTest(test.id)}
+                          className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         )}
 
