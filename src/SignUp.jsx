@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 // Ensure storage is available if you plan to link profile pictures or docs during signup
 import { auth, db, storage } from './firebase'; 
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { createUser, getRoleByName } from './services/databaseService';
+import { createUser, getRoleByName, isStudentRegistrationEnabled } from './services/databaseService';
 import { Loader2, Moon, Sun, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useTheme } from './ThemeContext';
 
@@ -14,8 +14,27 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+  const [checkingSettings, setCheckingSettings] = useState(true);
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
+
+  // Check if student registration is enabled
+  useEffect(() => {
+    const checkRegistrationStatus = async () => {
+      try {
+        setCheckingSettings(true);
+        const enabled = await isStudentRegistrationEnabled();
+        setRegistrationEnabled(enabled);
+      } catch (error) {
+        console.error('Error checking registration status:', error);
+        setRegistrationEnabled(true); // Default to enabled on error
+      } finally {
+        setCheckingSettings(false);
+      }
+    };
+    checkRegistrationStatus();
+  }, []);
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -80,10 +99,16 @@ const Signup = () => {
           </div>
         )}
 
+        {!registrationEnabled && !checkingSettings && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-100 text-amber-700 rounded-2xl text-xs font-bold animate-in fade-in zoom-in duration-300">
+            Student registration is currently disabled by the administrator. Please contact your administrator for assistance.
+          </div>
+        )}
+
         <form onSubmit={handleSignup} className="space-y-6">
           {/* Role Selection */}
           <div className={`p-1.5 rounded-2xl flex transition-colors ${isDark ? 'bg-slate-950' : 'bg-slate-100'}`}>
-            {['Student', 'Teacher', 'Admin'].map((r) => (
+            {['Student', 'Teacher'].map((r) => (
               <button 
                 key={r} type="button" onClick={() => setRole(r)}
                 className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all ${
@@ -100,22 +125,25 @@ const Signup = () => {
           <div className="space-y-4">
             <input 
               type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)}
+              disabled={!registrationEnabled || checkingSettings}
               className={`w-full px-5 py-4 rounded-2xl border outline-none transition-all ${
                 isDark ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-600' : 'bg-slate-50 border-slate-200'
-              } focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10`} required 
+              } focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 disabled:cursor-not-allowed`} required 
             />
             
             <div className="relative">
               <input 
                 type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
+                disabled={!registrationEnabled || checkingSettings}
                 className={`w-full px-5 py-4 rounded-2xl border outline-none transition-all ${
                   isDark ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-600' : 'bg-slate-50 border-slate-200'
-                } focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 pr-12`} required 
+                } focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 pr-12 disabled:opacity-50 disabled:cursor-not-allowed`} required 
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500 transition-colors"
+                disabled={!registrationEnabled || checkingSettings}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -123,10 +151,11 @@ const Signup = () => {
           </div>
 
           <button 
-            disabled={loading} 
-            className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-[0.98] flex justify-center items-center gap-2 disabled:opacity-70"
+            type="submit"
+            disabled={loading || !registrationEnabled || checkingSettings} 
+            className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-[0.98] flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : `Register as ${role}`}
+            {checkingSettings ? 'Loading...' : loading ? <Loader2 className="animate-spin" size={20} /> : !registrationEnabled ? 'Registration Disabled' : `Register as ${role}`}
           </button>
         </form>
 

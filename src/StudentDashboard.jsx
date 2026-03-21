@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Moon, Sun, BookOpen, Play, FileText, Clock, TrendingUp } from 'lucide-react';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
-import { getTopics, getMaterialsByTopic, getTestHistoryByUser, getStudentDashboardData, updateVideoProgress, getVideoProgressByUser, getPublishedTestsByTopic, getContent } from './services/databaseService';
+import { getTopics, getMaterialsByTopic, getTestHistoryByUser, getStudentDashboardData, updateVideoProgress, getVideoProgressByUser, getPublishedTestsByTopic } from './services/databaseService';
 import TestComponent from './components/TestComponent';
-import YouTubePlayer from './components/YouTubePlayer';
 import { useTheme } from './ThemeContext';
 
 const StudentDashboard = () => {
@@ -25,21 +24,8 @@ const StudentDashboard = () => {
   const [showTest, setShowTest] = useState(false);
   const [selectedTest, setSelectedTest] = useState(null);
   const [selectedTopic, setSelectedTopic] = useState(null); 
-  const [allContent, setAllContent] = useState([]);
-
+  
   const [progress, setProgress] = useState({ completedContent: 0, totalContent: 0, averageCompletion: 0 });
-
-  useEffect(() => {
-    const loadAllContent = async () => {
-      try {
-        const content = await getContent();
-        setAllContent(content || []);
-      } catch (err) {
-        console.error('Error loading all content:', err);
-      }
-    };
-    loadAllContent();
-  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -143,7 +129,6 @@ const StudentDashboard = () => {
             { id: 'scores', icon: '📈', label: 'View Scores' },
             { id: 'tests', icon: '📝', label: 'Tests Attempted' },
             { id: 'materials', icon: '📚', label: 'Study Materials' },
-            { id: 'my-content', icon: '📁', label: 'My Content' },
             { id: 'progress', icon: '📈', label: 'My Progress' }
           ].map((item) => (
             <button
@@ -206,7 +191,7 @@ const StudentDashboard = () => {
                     ) : (
                       testHistory.slice(0, 5).map((test) => (
                         <div key={test.id} className={`p-4 border rounded-2xl flex justify-between items-center group hover:shadow-md transition-all ${
-                          isDark ? 'bg-slate-950 border-slate-800 hover:bg-slate-900' : 'bg-slate-50/50 border-slate-50 hover:bg-white'
+                          isDark ? 'bg-slate-950 border-slate-800 hover:bg-slate-900' : 'bg-slate-50 border-slate-100 hover:bg-white'
                         }`}>
                           <div className="flex-1">
                             <p className={`font-bold text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{test.test_name || test.topic || 'Test'}</p>
@@ -256,7 +241,9 @@ const StudentDashboard = () => {
                         >
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-2xl">{topic.icon || '📚'}</span>
-                            <p className={`font-bold transition ${selectedTopic?.id === topic.id ? 'text-blue-400' : (isDark ? 'text-slate-300 group-hover:text-blue-400' : 'text-slate-600 group-hover:text-blue-600')}`}>
+                            <p className={`font-bold transition ${
+                              selectedTopic?.id === topic.id ? 'text-blue-400' : (isDark ? 'text-slate-300 group-hover:text-blue-400' : 'text-slate-600 group-hover:text-blue-600')
+                            }`}>
                               {topic.name}
                             </p>
                           </div>
@@ -436,72 +423,6 @@ const StudentDashboard = () => {
                   ))
                 )}
               </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'my-content' && (
-          <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className={`text-3xl font-black mb-8 tracking-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>My Content</h2>
-            <div className="space-y-6">
-              {allContent.length === 0 ? (
-                <div className={`p-8 text-center rounded-2xl ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                  <FileText className="mx-auto mb-4" size={48} />
-                  <p className={`text-lg font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>No content available yet</p>
-                  <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'} mt-2`}>Check back later for learning materials uploaded by your teachers.</p>
-                </div>
-              ) : (
-                allContent.map((content) => (
-                  <div key={content.id} className={`p-6 rounded-3xl shadow-sm border transition-all ${
-                    isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
-                  }`}>
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className={`text-xl font-bold mb-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>{content.title}</h3>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                            content.type === 'video' 
-                            ? 'bg-red-100 text-red-700' 
-                            : 'bg-blue-100 text-blue-700'
-                          }`}>
-                            {content.type === 'video' ? '📹 Video' : '📄 Document'}
-                          </span>
-                          <span className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                            Topic: {content.topic || 'General'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Content Display */}
-                    {content.type === 'video' && content.youtubeUrl && (
-                      <YouTubePlayer videoUrl={content.youtubeUrl} title={content.title} />
-                    )}
-                    
-                    {content.type === 'document' && content.driveUrl && (
-                      <div className="space-y-4">
-                        <div className={`p-4 border-2 border-dashed rounded-xl ${
-                          isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-300 bg-slate-50'
-                        }`}>
-                          <div className="flex items-center gap-3">
-                            <FileText className="text-blue-500" size={24} />
-                            <div>
-                              <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Document Available</p>
-                              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Click below to open in Google Drive</p>
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => window.open(content.driveUrl, '_blank')}
-                          className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
-                        >
-                          Open Document
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
             </div>
           </div>
         )}

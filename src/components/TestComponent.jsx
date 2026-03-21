@@ -45,6 +45,18 @@ const TestComponent = ({ topic, test, onTestComplete, onClose }) => {
     return () => clearInterval(interval);
   }, [testStarted, showResults]);
 
+  const toggleCheckboxAnswer = (questionId, answerIndex) => {
+    setSelectedAnswers((prev) => {
+      const current = Array.isArray(prev[questionId]) ? prev[questionId] : [];
+      const exists = current.includes(answerIndex);
+      const next = exists ? current.filter((x) => x !== answerIndex) : [...current, answerIndex];
+      return {
+        ...prev,
+        [questionId]: next
+      };
+    });
+  };
+
   const handleAnswerSelect = (questionId, answerIndex) => {
     setSelectedAnswers(prev => ({
       ...prev,
@@ -68,12 +80,28 @@ const TestComponent = ({ topic, test, onTestComplete, onClose }) => {
     let correct = 0;
     let total = 0;
 
-    questions.forEach(question => {
+    questions.forEach((question) => {
       if (question.type === 'text') return;
       if (!Array.isArray(question.options) || question.options.length === 0) return;
 
       total++;
-      if (selectedAnswers[question.id] === question.correctOption) {
+
+      const expected = question.correctOption;
+      const actual = selectedAnswers[question.id];
+
+      if (question.type === 'checkbox') {
+        const expectedArr = Array.isArray(expected) ? expected : (typeof expected === 'number' ? [expected] : []);
+        const actualArr = Array.isArray(actual) ? actual : [];
+        const expectedSorted = [...expectedArr].sort();
+        const actualSorted = [...actualArr].sort();
+        const isCorrect =
+          expectedSorted.length === actualSorted.length &&
+          expectedSorted.every((v, idx) => v === actualSorted[idx]);
+        if (isCorrect) correct++;
+        return;
+      }
+
+      if (actual === expected) {
         correct++;
       }
     });
@@ -127,6 +155,43 @@ const TestComponent = ({ topic, test, onTestComplete, onClose }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const isQuestionAnswered = (q) => {
+    const v = selectedAnswers[q.id];
+    if (q.type === 'text') return typeof v === 'string' && v.trim().length > 0;
+    if (q.type === 'checkbox') return Array.isArray(v) && v.length > 0;
+    return typeof v === 'number';
+  };
+
+  const allAnswered = questions.length > 0 && questions.every(isQuestionAnswered);
+
+  const getCorrectAnswerLabel = (q) => {
+    if (q.type === 'text') return '';
+    const expected = q.correctOption;
+    if (q.type === 'checkbox') {
+      const expectedArr = Array.isArray(expected) ? expected : (typeof expected === 'number' ? [expected] : []);
+      return expectedArr
+        .filter((idx) => typeof idx === 'number' && idx >= 0)
+        .map((idx) => q.options?.[idx])
+        .filter(Boolean)
+        .join(', ');
+    }
+    return q.options?.[expected] ?? '';
+  };
+
+  const getStudentAnswerLabel = (q) => {
+    const actual = selectedAnswers[q.id];
+    if (q.type === 'text') return typeof actual === 'string' ? actual : '';
+    if (q.type === 'checkbox') {
+      const arr = Array.isArray(actual) ? actual : [];
+      return arr
+        .filter((idx) => typeof idx === 'number' && idx >= 0)
+        .map((idx) => q.options?.[idx])
+        .filter(Boolean)
+        .join(', ');
+    }
+    return q.options?.[actual] ?? '';
+  };
+
   if (!topic) return null;
 
   const question = questions[currentQuestion];
@@ -177,8 +242,8 @@ const TestComponent = ({ topic, test, onTestComplete, onClose }) => {
             </div>
           ) : showResults ? (
             /* Results Screen */
-            <div className="text-center py-8">
-              <div className="mb-6">
+            <div className="py-8">
+              <div className="text-center mb-6">
                 {calculateScore().score >= 70 ? (
                   <CheckCircle className="mx-auto mb-4 text-green-500" size={64} />
                 ) : (
@@ -197,6 +262,80 @@ const TestComponent = ({ topic, test, onTestComplete, onClose }) => {
                   Time spent: {calculateScore().timeSpent} minutes
                 </p>
               </div>
+
+              <div className="mt-8">
+                <h4 className="text-lg font-bold text-slate-800 mb-4">Answer Review</h4>
+                <div className="space-y-4">
+                  {questions.map((q, idx) => {
+                    const expected = q.correctOption;
+                    const actual = selectedAnswers[q.id];
+
+                    let isCorrect = false;
+                    if (q.type === 'text') {
+                      isCorrect = false;
+                    } else if (q.type === 'checkbox') {
+                      const expectedArr = Array.isArray(expected) ? expected : (typeof expected === 'number' ? [expected] : []);
+                      const actualArr = Array.isArray(actual) ? actual : [];
+                      const expectedSorted = [...expectedArr].sort();
+                      const actualSorted = [...actualArr].sort();
+                      isCorrect =
+                        expectedSorted.length === actualSorted.length &&
+                        expectedSorted.every((v, i2) => v === actualSorted[i2]);
+                    } else {
+                      isCorrect = actual === expected;
+                    }
+
+                    const correctLabel = getCorrectAnswerLabel(q);
+                    const studentLabel = getStudentAnswerLabel(q);
+
+                    return (
+                      <div
+                        key={q.id}
+                        className={`p-4 rounded-xl border ${
+                          q.type === 'text'
+                            ? 'border-slate-200 bg-slate-50'
+                            : isCorrect
+                            ? 'border-green-200 bg-green-50'
+                            : 'border-red-200 bg-red-50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="text-sm font-bold text-slate-800">
+                              Q{idx + 1}. {q.question}
+                            </div>
+                            {q.type === 'text' ? (
+                              <div className="mt-2 text-sm text-slate-700">
+                                <div className="font-semibold">Your answer:</div>
+                                <div className="mt-1 whitespace-pre-wrap">{studentLabel || '-'}</div>
+                              </div>
+                            ) : (
+                              <div className="mt-2 text-sm text-slate-700 space-y-1">
+                                <div>
+                                  <span className="font-semibold">Your answer:</span> {studentLabel || '-'}
+                                </div>
+                                <div>
+                                  <span className="font-semibold">Correct answer:</span> {correctLabel || '-'}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {q.type !== 'text' ? (
+                            <div className={`text-xs font-bold px-3 py-1 rounded-full ${isCorrect ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+                              {isCorrect ? 'Correct' : 'Wrong'}
+                            </div>
+                          ) : (
+                            <div className="text-xs font-bold px-3 py-1 rounded-full bg-slate-700 text-white">
+                              Submitted
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="flex gap-4 justify-center">
                 <button
                   onClick={onClose}
@@ -239,6 +378,32 @@ const TestComponent = ({ topic, test, onTestComplete, onClose }) => {
                     placeholder="Type your answer..."
                     rows={4}
                   />
+                ) : question.type === 'checkbox' ? (
+                  <div className="space-y-3">
+                    {(question.options || []).map((option, index) => {
+                      const checked = Array.isArray(selectedAnswers[question.id])
+                        ? selectedAnswers[question.id].includes(index)
+                        : false;
+                      return (
+                        <label
+                          key={index}
+                          className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                            checked
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleCheckboxAnswer(question.id, index)}
+                            className="mr-3"
+                          />
+                          <span className="flex-1 text-slate-700">{option}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {(question.options || []).map((option, index) => (
@@ -282,7 +447,7 @@ const TestComponent = ({ topic, test, onTestComplete, onClose }) => {
                 {currentQuestion === questions.length - 1 ? (
                   <button
                     onClick={handleSubmitTest}
-                    disabled={Object.keys(selectedAnswers).length < questions.length}
+                    disabled={!allAnswered}
                     className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? 'Submitting...' : 'Submit Test'}

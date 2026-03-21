@@ -22,6 +22,8 @@ const TESTS_COLLECTION = 'tests';
 const TEST_HISTORY_COLLECTION = 'test_history';
 const CONTENT_COLLECTION = 'content';
 const VIDEO_PROGRESS_COLLECTION = 'video_progress';
+const SETTINGS_COLLECTION = 'settings';
+const SETTINGS_DOC_ID = 'platform_config';
 
 // ============================================
 // ROLE MANAGEMENT (ROLE entity)
@@ -182,6 +184,16 @@ export const updateUserRole = async (userId, roleId) => {
   }
 };
 
+export const updateUser = async (userId, userData) => {
+  try {
+    await updateDoc(doc(db, USER_COLLECTION, userId), userData);
+    return { id: userId, ...userData };
+  } catch (error) {
+    console.error('Error updating user:', error);
+    throw error;
+  }
+};
+
 // ============================================
 // TESTS MANAGEMENT (TESTS entity)
 // ============================================
@@ -220,11 +232,17 @@ export const getTestsByCreator = async (creatorId) => {
   try {
     const q = query(
       collection(db, TESTS_COLLECTION),
-      where('creator_id', '==', creatorId),
-      orderBy('createdAt', 'desc')
+      where('creator_id', '==', creatorId)
     );
     const testsSnapshot = await getDocs(q);
-    return testsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const items = testsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Sort client-side to avoid requiring composite index
+    items.sort((a, b) => {
+      const aTime = a.createdAt?.toMillis?.() || new Date(a.createdAt || 0).getTime() || 0;
+      const bTime = b.createdAt?.toMillis?.() || new Date(b.createdAt || 0).getTime() || 0;
+      return bTime - aTime;
+    });
+    return items;
   } catch (error) {
     console.error('Error fetching tests by creator:', error);
     return [];
@@ -411,11 +429,17 @@ export const getContentByUploader = async (uploaderId) => {
   try {
     const q = query(
       collection(db, CONTENT_COLLECTION),
-      where('uploadedBy', '==', uploaderId),
-      orderBy('createdAt', 'desc')
+      where('uploadedBy', '==', uploaderId)
     );
     const contentSnapshot = await getDocs(q);
-    return contentSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const items = contentSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Sort client-side to avoid requiring composite index
+    items.sort((a, b) => {
+      const aTime = a.createdAt?.toMillis?.() || new Date(a.createdAt || 0).getTime() || 0;
+      const bTime = b.createdAt?.toMillis?.() || new Date(b.createdAt || 0).getTime() || 0;
+      return bTime - aTime;
+    });
+    return items;
   } catch (error) {
     console.error('Error fetching content by uploader:', error);
     return [];
@@ -449,8 +473,23 @@ export const getContentById = async (contentId) => {
 
 export const updateContent = async (contentId, contentData) => {
   try {
-    await updateDoc(doc(db, CONTENT_COLLECTION, contentId), contentData);
-    return { id: contentId, ...contentData };
+    // Recalculate type based on URLs if youtubeUrl or driveUrl is being updated
+    let type = contentData.type;
+    if (contentData.youtubeUrl !== undefined || contentData.driveUrl !== undefined) {
+      if (contentData.youtubeUrl && contentData.youtubeUrl.trim()) {
+        type = 'video';
+      } else if (contentData.driveUrl && contentData.driveUrl.trim()) {
+        type = 'document';
+      }
+    }
+    
+    const dataToUpdate = {
+      ...contentData,
+      ...(type !== undefined && { type })
+    };
+    
+    await updateDoc(doc(db, CONTENT_COLLECTION, contentId), dataToUpdate);
+    return { id: contentId, ...dataToUpdate };
   } catch (error) {
     console.error('Error updating content:', error);
     throw error;
@@ -749,5 +788,55 @@ export const initializeSampleData = async () => {
     console.log('Sample data initialized successfully');
   } catch (error) {
     console.error('Error initializing sample data:', error);
+  }
+};
+
+// ============================================
+// PLATFORM SETTINGS MANAGEMENT
+// ============================================
+
+export const getPlatformSettings = async () => {
+  try {
+    const settingsDoc = await getDoc(doc(db, SETTINGS_COLLECTION, SETTINGS_DOC_ID));
+    if (settingsDoc.exists()) {
+      return settingsDoc.data();
+    }
+    // Return default settings if none exist
+    return {
+      platformName: 'LMS Portal',
+      studentRegistrationEnabled: true,
+      createdAt: serverTimestamp()
+    };
+  } catch (error) {
+    console.error('Error fetching platform settings:', error);
+    return {
+      platformName: 'LMS Portal',
+      studentRegistrationEnabled: true
+    };
+  }
+};
+
+export const updatePlatformSettings = async (settingsData) => {
+  try {
+    const settingsRef = doc(db, SETTINGS_COLLECTION, SETTINGS_DOC_ID);
+    const dataToSave = {
+      ...settingsData,
+      updatedAt: serverTimestamp()
+    };
+    await setDoc(settingsRef, dataToSave, { merge: true });
+    return { id: SETTINGS_DOC_ID, ...dataToSave };
+  } catch (error) {
+    console.error('Error updating platform settings:', error);
+    throw error;
+  }
+};
+
+export const isStudentRegistrationEnabled = async () => {
+  try {
+    const settings = await getPlatformSettings();
+    return settings.studentRegistrationEnabled !== false;
+  } catch (error) {
+    console.error('Error checking student registration status:', error);
+    return true; // Default to enabled if error
   }
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'; 
 import { useNavigate } from 'react-router-dom';
-import { Moon, Sun, CheckCircle2 } from 'lucide-react'; 
-import { signOut } from 'firebase/auth';
+import { Moon, Sun, CheckCircle2, Play, FileText } from 'lucide-react'; 
+import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import { createTest, createContent, deleteContent, deleteTest, getContentByUploader, getTestsByCreator, updateContent, updateTest } from './services/databaseService';
 import { useTheme } from './ThemeContext';
@@ -10,7 +10,9 @@ const TeacherDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('create-test');
   const { isDark, toggleTheme } = useTheme();
-  
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [testTitle, setTestTitle] = useState('');
   const [contentTitle, setContentTitle] = useState('');
   const [contentTopic, setContentTopic] = useState('');
@@ -28,27 +30,32 @@ const TeacherDashboard = () => {
   const [editingTestId, setEditingTestId] = useState(null);
   const [editingContentId, setEditingContentId] = useState(null);
 
-  const studentStats = [
-    { id: 1, name: "Aarav Sharma", progress: 85, avgScore: 92, lastActive: "2 hours ago" },
-    { id: 2, name: "Ishani Verma", progress: 40, avgScore: 78, lastActive: "5 mins ago" },
-    { id: 3, name: "Rohan Gupta", progress: 100, avgScore: 95, lastActive: "Yesterday" },
-  ];
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
+  // Load content/tests when tab changes AND user is authenticated
   useEffect(() => {
     const loadLists = async () => {
       if (activeTab !== 'my-tests' && activeTab !== 'my-content') return;
-
-      const currentUser = auth.currentUser;
       if (!currentUser) return;
 
       setListLoading(true);
       try {
+        console.log('Loading lists for user:', currentUser.uid);
         if (activeTab === 'my-tests') {
           const tests = await getTestsByCreator(currentUser.uid);
+          console.log('Fetched tests:', tests);
           setMyTests(tests || []);
         }
         if (activeTab === 'my-content') {
           const content = await getContentByUploader(currentUser.uid);
+          console.log('Fetched content:', content);
           setMyContent(content || []);
         }
       } catch (e) {
@@ -59,7 +66,7 @@ const TeacherDashboard = () => {
     };
 
     loadLists();
-  }, [activeTab]);
+  }, [activeTab, currentUser]);
 
   const addQuestion = () => {
     setQuestions([...questions, { 
@@ -244,8 +251,7 @@ const TeacherDashboard = () => {
             { id: 'materials', icon: '', label: 'Upload Content' },
             { id: 'create-test', icon: '', label: 'Create Test' },
             { id: 'my-tests', icon: '', label: 'My Tests' },
-            { id: 'my-content', icon: '', label: 'My Content' },
-            { id: 'tracking', icon: '', label: 'Student Tracking' }
+            { id: 'my-content', icon: '', label: 'My Published Content' }
           ].map((item) => (
             <button
               key={item.id}
@@ -508,7 +514,7 @@ const TeacherDashboard = () => {
 
         {activeTab === 'my-content' && (
           <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className={`text-3xl font-black mb-8 tracking-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>My Content</h2>
+            <h2 className={`text-3xl font-black mb-8 tracking-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>My Published Content</h2>
             <div className={`rounded-[2rem] shadow-xl border overflow-hidden transition-colors ${isDark ? 'bg-slate-900 border-slate-800 shadow-none' : 'bg-white border-slate-100 shadow-slate-200/50'}`}>
               <div className="p-6 space-y-3">
                 {listLoading ? (
@@ -521,8 +527,24 @@ const TeacherDashboard = () => {
                   myContent.map((c) => (
                     <div key={c.id} className={`p-5 rounded-2xl border flex items-center justify-between gap-4 ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                       <div className="min-w-0">
-                        <div className={`font-black truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{c.title || 'Untitled Content'}</div>
-                        <div className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Type: {c.type || 'content'} | Topic: {c.topic || 'General'}</div>
+                        <div className="flex items-center gap-3 mb-2">
+                          {c.type === 'video' ? (
+                            <Play className="w-5 h-5 text-red-500" size={16} />
+                          ) : (
+                            <FileText className="w-5 h-5 text-blue-500" size={16} />
+                          )}
+                          <div className={`font-black truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{c.title || 'Untitled Content'}</div>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${
+                            c.type === 'video' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {c.type === 'video' ? 'Video' : 'Document'}
+                          </span>
+                          <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                            Topic: {c.topic || 'General'}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => startEditContent(c)} className="px-4 py-2 rounded-xl text-xs font-black bg-blue-600 text-white hover:bg-blue-700 transition-colors">Edit</button>
@@ -532,46 +554,6 @@ const TeacherDashboard = () => {
                   ))
                 )}
               </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'tracking' && (
-          <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className={`text-3xl font-black mb-8 tracking-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>Student Performance Analytics</h2>
-            <div className={`rounded-[2rem] shadow-xl border overflow-hidden transition-colors ${isDark ? 'bg-slate-900 border-slate-800 shadow-none' : 'bg-white border-slate-100 shadow-slate-200/50'}`}>
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className={`${isDark ? 'bg-slate-800/50 border-slate-800' : 'bg-slate-50/50 border-slate-100'} border-b`}>
-                      <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Student Name</th>
-                      <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Course Progress</th>
-                      <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Avg. Test Score</th>
-                      <th className="p-6 text-xs font-black text-slate-400 uppercase tracking-widest">Last Seen</th>
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                    {studentStats.map((student) => (
-                      <tr key={student.id} className={`transition-colors group ${isDark ? 'hover:bg-slate-800/50' : 'hover:bg-blue-50/30'}`}>
-                        <td className={`p-6 font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{student.name}</td>
-                        <td className="p-6">
-                            <div className={`w-full h-2 rounded-full max-w-[120px] ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                                <div className="bg-blue-600 h-2 rounded-full transition-all duration-1000" style={{width: `${student.progress}%`}}></div>
-                            </div>
-                            <span className="text-[10px] font-bold text-slate-400 mt-1 block">{student.progress}% Complete</span>
-                        </td>
-                        <td className="p-6 font-black text-blue-600">{student.avgScore}%</td>
-                        <td className="p-6">
-                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold transition-colors ${isDark ? 'bg-slate-800 text-slate-400 group-hover:bg-slate-700' : 'bg-slate-100 text-slate-500 group-hover:bg-white'}`}>
-                                {student.lastActive}
-                            </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className={`p-6 text-center transition-colors ${isDark ? 'bg-slate-900/50' : 'bg-slate-50/50'}`}>
-                    <button className="text-xs font-bold text-blue-600 hover:underline cursor-pointer tracking-wider uppercase">Download Detailed Report</button>
-                </div>
             </div>
           </div>
         )}
